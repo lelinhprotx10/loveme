@@ -1,0 +1,185 @@
+---
+- hosts: "{{hostname}}"
+  gather_facts: yes
+  become: yes
+  pre_tasks:
+    - name: 'install python'
+      raw: apt update -y && apt install python3 -y
+      tags: ['always']
+  tasks:
+    - name: pwd
+      action: pwd
+    - name: check hostname
+      action: hostnamectl
+---
+---
+- hosts: "{{hostname}}"
+  gather_facts: yes
+  become: yes
+  tasks:
+    - name: Install  nginx
+      apt:
+        name: nginx
+        state: latest
+    - name: Start service nginx, if not started
+      service:
+        name: httpd
+        state: started
+        enabled: yes
+      ignore_errors: yes
+    - name: stop firewall ubuntu
+      command: "{{item}}"
+      with_items:
+        - systemctl stop ufw
+        - systemctl disable ufw
+      ignore_errors: yes
+    - name: copy the nginx config file and restart nginx
+      copy:
+        src: /root/LAbs/static_site.cfg
+        dest: /etc/nginx/sites-available/static_site.cfg
+      ignore_errors: yes
+    - name: create symlink
+      file:
+        src: /etc/nginx/sites-available/static_site.cfg
+        dest: /etc/nginx/sites-enabled/default
+        state: link
+      ignore_errors: yes
+    - name: copy the content of the web site
+      copy:
+        src: /root/LAbs/
+        dest: /home/administrator
+    - name: restart nginx
+      service:
+        name: nginx
+        state: restarted
+---
+- hosts: "{{hostname}}"
+  gather_facts: yes
+  become: true
+  tasks:
+    - name: disable swap
+      shell: |
+        sed -i '/swap/d' /etc/fstab
+        swapoff -a
+      ignore_errors: yes
+    - name: Set a hostname specifying strategy
+      ansible.builtin.hostname:
+        name: master
+        use: systemd
+    - name: stop firewall ubuntu
+      command: "{{item}}"
+      with_items:
+        - systemctl stop ufw
+        - systemctl disable ufw
+    - name: Update and upgrade apt packages
+      apt:
+        update_cache: yes
+        upgrade: yes
+  roles:
+    - role: ansible-role-nginx
+      vars:
+        nginx_status_enabled: true
+---
+- hosts: "{{hostname}}"
+  gather_facts: yes
+  become_user: tech01
+  tasks:
+    - name: start redis-3.2.0_8081
+      script: /home/tech01/SH/start-redis.sh
+      remote_src: yes
+      ignore_errors: yes
+    - name: start elasticsearch-6.6.2
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/elasticsearch-2.3.5
+        - bash /bin/elasticsearch -d
+      ignore_errors: yes
+    - name: start kafka_2.11-0.10.1.1
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/kafka_2.11-0.10.1.1
+        - bash /bin/kafka-server-start.sh -daemon config/server.properties
+      ignore_errors: yes
+    - name: start zookeeper
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/zookeeper_mm
+        - bash /start.sh start
+      ignore_errors: yes
+    - name: start redis port 8081
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/redis-3.2.0_8081
+        - bash /src/redis-server redis.conf
+      ignore_errors: yes
+    - name: start EInvoiceGW
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/deploy_new_92021/EInvoiceGW
+        - bash /bin/einvoicegw start
+      ignore_errors: yes
+    - name: start EInvoiceReportGw
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/deploy_new_92021/EInvoiceReportGw
+        - bash /bin/Reportgw start
+      ignore_errors: yes
+    - name: start tomcat 9999
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/deploy_new_92021/tomcat9999
+        - bash /bin/startup.sh
+      ignore_errors: yes
+---
+- hosts: "{{hostname}}"
+  gather_facts: yes
+  become_user: tech01
+  tasks:
+    - name: start redis-3.2.0_8081
+      command:
+              - /src/redis-server redis.conf
+      ignore_errors: yes
+    - name: start elasticsearch-6.6.2
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/elasticsearch-2.3.5
+        - bash /bin/elasticsearch -d
+      ignore_errors: yes
+    - name: start kafka_2.11-0.10.1.1
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/kafka_2.11-0.10.1.1
+        - bash /bin/kafka-server-start.sh -daemon config/server.properties
+      ignore_errors: yes
+    - name: start zookeeper
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/zookeeper_mm
+        - bash /start.sh start
+      ignore_errors: yes
+    - name: start redis port 8081
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/redis-3.2.0_8081
+        - bash /src/redis-server redis.conf
+      ignore_errors: yes
+    - name: start EInvoiceGW
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/deploy_new_92021/EInvoiceGW
+        - bash /bin/einvoicegw start
+      ignore_errors: yes
+    - name: start EInvoiceReportGw
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/deploy_new_92021/EInvoiceReportGw
+        - bash /bin/Reportgw start
+      ignore_errors: yes
+    - name: start tomcat 9999
+      command: "{{item}}"
+      with_items:
+        - cd /home/tech01/einvoice/deploy_new_92021/tomcat9999
+        - bash /bin/startup.sh
+      ignore_errors: yes
+
+
